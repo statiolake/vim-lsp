@@ -526,8 +526,14 @@ function! lsp#default_get_supported_capabilities(server_info) abort
     \       'references': {
     \           'dynamicRegistration': v:false,
     \       },
-    \       'semanticHighlightingCapabilities': {
-    \           'semanticHighlighting': lsp#ui#vim#semantic#is_enabled()
+    \       'semanticTokens': {
+    \           'requests': {
+    \               'range': v:false,
+    \               'full': { 'delta': v:false },
+    \           },
+    \           'tokenTypes': lsp#ui#vim#semantic#get_default_supported_token_types(),
+    \           'tokenModifiers': lsp#ui#vim#semantic#get_default_supported_token_modifiers(),
+    \           'formats': ['relative'],
     \       },
     \       'synchronization': {
     \           'didSave': v:true,
