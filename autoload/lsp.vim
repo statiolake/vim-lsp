@@ -58,6 +58,9 @@ function! lsp#enable() abort
     if g:lsp_signature_help_enabled
         call lsp#ui#vim#signature_help#setup()
     endif
+    if g:lsp_semantic_enabled
+        call lsp#ui#vim#semantic#setup()
+    endif
     call lsp#ui#vim#completion#_setup()
     call lsp#internal#document_highlight#_enable()
     call lsp#internal#diagnostics#_enable()
@@ -74,6 +77,7 @@ function! lsp#disable() abort
     call lsp#ui#vim#signature_help#_disable()
     call lsp#ui#vim#completion#_disable()
     call lsp#internal#document_highlight#_disable()
+    call lsp#ui#vim#semantic#_disable()
     call lsp#internal#diagnostics#_disable()
     call lsp#internal#show_message_request#_disable()
     call lsp#internal#work_done_progress#_disable()
