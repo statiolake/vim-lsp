@@ -533,7 +533,7 @@ function! lsp#default_get_supported_capabilities(server_info) abort
     \       'semanticTokens': {
     \           'requests': {
     \               'range': v:false,
-    \               'full': { 'delta': v:false },
+    \               'full': { 'delta': v:true },
     \           },
     \           'tokenTypes': lsp#ui#vim#semantic#get_default_supported_token_types(),
     \           'tokenModifiers': lsp#ui#vim#semantic#get_default_supported_token_modifiers(),
