@@ -151,7 +151,7 @@ function! s:handle_full_semantic_highlight(server, bufnr, data) abort
     call lsp#log('got lines seconds:', l:lap_end - l:lap_start)
     let l:lap_start = reltimefloat(reltime())
 
-    let l:curr_highlights = s:parse_semantic_tokens(a:server, l:data)
+    let l:curr_highlights = s:parse_semantic_tokens(a:server, l:data, l:num_lines)
     if s:is_null(l:curr_highlights)
         call lsp#log('Skipping semantic tokens: server returned invalid semantic tokens')
         return
@@ -161,14 +161,14 @@ function! s:handle_full_semantic_highlight(server, bufnr, data) abort
     call lsp#log('parsing semantic tokens seconds:', l:lap_end - l:lap_start)
     let l:lap_start = reltimefloat(reltime())
 
-    let l:prev_highlights = s:get_highlights(a:bufnr)
+    let l:prev_highlights = s:get_highlights(a:bufnr, l:num_lines)
 
     let l:lap_end = reltimefloat(reltime())
     call lsp#log('getting current highlight seconds', l:lap_end - l:lap_start)
     let l:lap_start = reltimefloat(reltime())
 
     let l:to_update = s:calc_diff(l:prev_highlights, l:curr_highlights, l:num_lines)
-    " call lsp#log("highlight updates:", l:to_update)
+    call lsp#log("highlight updates:", l:to_update)
     for [l:line, l:highlights] in l:to_update
         call s:remove_highlight(a:bufnr, l:line)
         for l:hl in l:highlights
@@ -211,14 +211,14 @@ function! s:is_null(v) abort
     return type(a:v) == type(v:null) && a:v == v:null
 endfunction
 
-function! s:parse_semantic_tokens(server, data) abort
+function! s:parse_semantic_tokens(server, data, num_lines) abort
     let l:num_data = len(a:data)
     if l:num_data % 5 != 0
         call lsp#log(printf('Skipping semantic token: invalid number of data (%d) returned', l:num_data))
         return v:null
     endif
 
-    let l:res = {}
+    let l:res = map(range(a:num_lines), { -> [] })
     let l:legend = lsp#ui#vim#semantic#get_legend(a:server)
     let l:current_line = 0
     let l:current_char = 0
@@ -235,10 +235,6 @@ function! s:parse_semantic_tokens(server, data) abort
         let l:char = l:delta_line == 0 ? l:current_char + l:delta_start_char : l:delta_start_char
         let l:current_line = l:line
         let l:current_char = l:char
-
-        if !has_key(l:res, l:line)
-            let l:res[l:line] = []
-        endif
 
         call add(l:res[l:line], {
           \     'line': l:line,
@@ -278,19 +274,8 @@ endfunction
 
 function! s:calc_diff(prev_highlights, curr_highlights, num_lines) abort
     let l:lnums_to_update = []
+    let l:Comparator = funcref('s:compare_highlights')
     for l:i in range(a:num_lines)
-        let l:ph = has_key(a:prev_highlights, l:i)
-        let l:ch = has_key(a:curr_highlights, l:i)
-
-        if (!l:ph && l:ch) || (l:ph && !l:ch)
-            call add(l:lnums_to_update, l:i)
-            continue
-        endif
-
-        if !l:ph && !l:ch
-            continue
-        endif
-
         let l:pp = a:prev_highlights[l:i]
         let l:cc = a:curr_highlights[l:i]
         if len(l:pp) != len(l:cc)
@@ -298,8 +283,8 @@ function! s:calc_diff(prev_highlights, curr_highlights, num_lines) abort
             continue
         endif
 
-        call sort(l:pp)
-        call sort(l:cc)
+        call sort(l:pp, l:Comparator)
+        call sort(l:cc, l:Comparator)
         for l:j in range(len(l:pp))
             if s:compare_highlights(l:pp[l:j], l:cc[l:j]) != 0
                 call add(l:lnums_to_update, l:i)
@@ -331,11 +316,10 @@ function! s:init_highlight(server, buf) abort
 endfunction
 
 " Vim/Neovim highlight API {{{
-function! s:get_highlights(bufnr) abort
-    let l:lines = len(getbufline(a:bufnr, 1, '$'))
-    let l:res = {}
+function! s:get_highlights(bufnr, num_lines) abort
+    let l:res = map(range(a:num_lines), { -> [] })
     if s:use_vim_textprops
-        for l:line in range(l:lines)
+        for l:line in range(a:num_lines)
             let l:list = prop_list(l:line + 1, {'bufnr': a:bufnr})
             for l:prop in l:list
                 if l:prop['start'] == 0 || l:prop['end'] == 0
@@ -346,7 +330,6 @@ function! s:get_highlights(bufnr) abort
                 let l:group = l:prop['type']
                 let l:start = l:prop['col'] - 1
                 let l:end = l:start + l:prop['length']
-                if !has_key(l:res, l:line) | let l:res[l:line] = [] | endif
                 call add(l:res[l:line], {
                   \     'line': l:line,
                   \     'start_char': l:start,
@@ -364,7 +347,6 @@ function! s:get_highlights(bufnr) abort
           \     {'details': v:true}
           \ )
         for [_, l:line, l:start, l:details] in l:marks
-            if !has_key(l:res, l:line) | let l:res[l:line] = [] | endif
             call add(l:res[l:line], {
               \     'line': l:line,
               \     'start_char': l:start,
@@ -408,7 +390,7 @@ endfunction
 function! s:remove_highlight(bufnr, line) abort
     if s:use_vim_textprops
         call prop_clear(a:line + 1, a:line + 1, {'bufnr': a:bufnr})
-    elseif s:use_vim_textprops
+    elseif s:use_nvim_highlight
         call nvim_buf_clear_namespace(a:bufnr, s:namespace_id, a:line, a:line + 1)
     endif
 endfunction
