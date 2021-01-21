@@ -112,6 +112,12 @@ function! lsp#ui#vim#semantic#display_token_types() abort
     endfor
 endfunction
 
+function! s:do_semantic_highlight_if_supported() abort
+    if len(s:get_supported_servers())
+        call lsp#ui#vim#semantic#do_semantic_highlight()
+    endif
+endfunction
+
 function! s:handle_full_semantic_highlight(server, bufnr, data) abort
     let l:start_time = reltimefloat(reltime())
     let l:lap_start = reltimefloat(reltime())
@@ -408,7 +414,8 @@ endfunction
 function! lsp#ui#vim#semantic#setup() abort
     augroup _lsp_semantic_tokens
         autocmd!
-        autocmd BufEnter,CursorHold,CursorHoldI * if len(s:get_supported_servers()) > 0 | call lsp#ui#vim#semantic#do_semantic_highlight() | endif
+        autocmd BufEnter,TextChanged * call s:do_semantic_highlight_if_supported()
+        autocmd User lsp_server_init call s:do_semantic_highlight_if_supported()
     augroup END
 endfunction
 
